@@ -1,94 +1,127 @@
 # Testes de falha
 
-Aqui eu testei os principais cenarios de erro do fluxo de OAuth, direto na aplicacao em producao (`https://projeto01-j0i.pages.dev`), usando `curl` pelo terminal. A ideia e provar que o sistema rejeita corretamente tentativas invalidas, e nao so que o "caminho feliz" funciona.
+Testei os 6 cenários pedidos direto na aplicação em produção (`https://projeto01-j0i.pages.dev`), a maioria via `curl` no terminal (pra conseguir controlar exatamente o que estava sendo enviado) e os últimos dois direto no navegador. Os valores de `state`, `code_challenge` e cookies foram substituídos por `[REMOVIDO]`.
 
-Todos os testes abaixo sao reais, rodei um por um e colei o resultado (status HTTP + corpo da resposta) que o `curl` devolveu.
+## Caso 1 — retorno sem o cookie temporário
 
-## 1. Provedor invalido no login
+**Preparação:** sem passar antes por `/oauth/login/google`, ou seja, sem o cookie `__Host-oauth-tx` no navegador/cliente.
 
-Tentei logar com um provedor que nao existe, tipo `/oauth/login/facebook`.
-
-```
-GET /oauth/login/facebook
-HTTP/2 400
-Provedor OAuth invalido
-```
-
-Era pra isso acontecer, porque `getProvider()` so reconhece `google` e `github`. Qualquer outra coisa cai no `if (!provider)` e retorna 400 antes de tentar redirecionar pra lugar nenhum.
-
-## 2. Consultar sessao sem estar logado
-
-Chamei `/api/me` sem nenhum cookie de sessao.
-
-```
-GET /api/me
-HTTP/2 401
-{"authenticated":false}
-```
-
-Sem o cookie `__Host-session`, a funcao nem consulta o D1, ja retorna 401 com `authenticated: false`. E esse retorno que o `app.js` usa pra decidir se mostra a tela de login ou a tela de usuario logado.
-
-## 3. Callback sem cookie de transacao
-
-Chamei o callback (`/oauth/callback/google`) direto, sem ter passado antes pelo `/oauth/login/google` — ou seja, sem o cookie `__Host-oauth-tx` no navegador.
-
+**Pedido enviado:**
 ```
 GET /oauth/callback/google?code=fake&state=fake
+```
+(sem enviar o cookie `__Host-oauth-tx`)
+
+**Resultado esperado:** a aplicação não deve aceitar o callback sem saber a qual transação de login ele pertence.
+
+**Resultado observado:**
+```
 HTTP/2 400
 Sessao de login expirada ou ausente
 ```
+Sem o cookie de transação, a função nem tenta validar `code`/`state` — corta o fluxo na hora.
 
-Sem esse cookie nao tem como saber qual foi a transacao de login que o usuario comecou, entao a funcao corta o fluxo na hora.
+## Caso 2 — state alterado
 
-## 4. Callback com state incorreto
+**Preparação:** iniciei um login real (`/oauth/login/google`) até ter um cookie de transação válido salvo no D1.
 
-Aqui eu fiz o login de verdade ate pegar o cookie de transacao, mas troquei o `state` da URL por um valor qualquer (diferente do que foi salvo no D1).
-
+**Pedido enviado:**
 ```
-GET /oauth/callback/google?code=...&state=valor_errado
+GET /oauth/callback/google?code=...&state=valor_diferente_do_salvo
+```
+
+**Resultado esperado:** o `state` da URL precisa bater com o que foi salvo quando a transação começou; se não bater, deve ser rejeitado.
+
+**Resultado observado:**
+```
 HTTP/2 400
 Parametro state invalido
 ```
 
-O `state` que vem na URL e comparado (via hash) com o que foi salvo quando o login comecou. Se nao bate, e sinal de possivel CSRF/replay, e a funcao bloqueia.
+## Caso 3 — reutilização da transação
 
-## 5. Provedor da URL diferente do provedor da transacao
+**Preparação:** mesmo cookie de transação e `state` válidos, usados duas vezes seguidas.
 
-Comecei um login pelo Google (cookie de transacao criado com `provider: google`), mas usei esse mesmo cookie pra chamar `/oauth/callback/github`.
+**Pedido enviado:**
+1ª chamada com `code` inválido (não veio de um login real):
+```
+GET /oauth/callback/google?code=fake&state=<state_valido>
+```
+Depois, repeti a mesma URL/cookie exatamente igual.
+
+**Resultado esperado:** depois da primeira tentativa (mesmo que ela falhe), a transação não deve poder ser usada de novo.
+
+**Resultado observado:**
+- 1ª chamada: `HTTP/2 502` (o `code` era falso, então a troca por token falhou lá na frente — mas a transação já tinha sido apagada do D1 nesse momento, antes mesmo de saber se o code era bom).
+- 2ª chamada (replay): `HTTP/2 400` — `Transacao OAuth invalida ou expirada`.
+
+A transação é apagada do banco assim que o callback é recebido, então não dá pra reaproveitar um `code`/`state` capturado.
+
+## Caso 4 — sessão expirada
+
+**Preparação:** sessão real, autenticada via GitHub, e depois forcei a expiração direto no banco D1 (`UPDATE sessions SET expires_at = 0 WHERE ...`, rodado no console do D1).
+
+**Pedido enviado:** recarregar a página / chamar `GET /api/me` com o cookie de sessão ainda no navegador.
+
+**Resultado esperado:** com `expires_at` no passado, a sessão deve ser tratada como inválida.
+
+**Resultado observado:** *(em andamento — aguardando confirmação)*
+
+**Como confirmar:** no console D1 do Cloudflare Dashboard (aba Console), com uma sessão real já criada, rodar `UPDATE sessions SET expires_at = 0 WHERE id_hash = (SELECT id_hash FROM sessions ORDER BY created_at DESC LIMIT 1);` e depois chamar `GET /api/me` (ou recarregar a página). Esse passo mexe direto no banco de produção, então precisa ser feito manualmente por quem tem acesso ao dashboard — não automatizei essa parte. Pelo código (`functions/api/me.js`), a consulta já compara `session.expires_at` com o horário atual e devolve `401 {"authenticated": false}` quando a sessão está vencida, então o resultado esperado é esse.
+
+## Caso 5 — origem inválida na saída (logout)
+
+**Preparação:** sessão real autenticada, aberta em uma aba. Em outra aba, `https://example.com` (origem diferente).
+
+**Pedido enviado:** no console do navegador, a partir de `https://example.com`:
+```js
+fetch('https://projeto01-j0i.pages.dev/oauth/logout', { method: 'POST', credentials: 'include' })
+```
+
+**Resultado esperado:** a rota deve recusar a operação quando a origem for diferente da do próprio site.
+
+**Resultado observado:** a chamada pelo navegador falhou (`TypeError: Failed to fetch`), efeito combinado de CORS e do `SameSite=Strict` do cookie de sessão, que o Chrome nem chega a anexar numa requisição de outra origem. Voltando na aba com a sessão real e recarregando a página, continuei autenticado normalmente — a tentativa cross-site não teve efeito nenhum na sessão.
+
+Só que, testando via `curl` com um `Origin: https://example.com` forjado direto na API (sem passar pelas regras do navegador), a rota respondia 302 normalmente — ou seja, o servidor não estava de fato checando o `Origin`, só existia a proteção do lado do navegador (`SameSite=Strict`). Reportei isso e implementei a checagem que faltava em `functions/oauth/logout.js`: agora a rota lê o header `Origin` e, se ele vier preenchido e for diferente da origem do próprio site, responde 403 antes de tocar em qualquer coisa. Depois do deploy, repeti o mesmo teste:
 
 ```
-GET /oauth/callback/github?code=...&state=<state_real_do_google>
-HTTP/2 400
-Provedor da transacao nao confere
+curl -X POST -H "Origin: https://example.com" https://projeto01-j0i.pages.dev/oauth/logout
+→ HTTP/2 403
+
+curl -X POST https://projeto01-j0i.pages.dev/oauth/logout
+→ HTTP/2 302 (sem Origin, comportamento normal)
+
+curl -X POST -H "Origin: https://projeto01-j0i.pages.dev" https://projeto01-j0i.pages.dev/oauth/logout
+→ HTTP/2 302 (Origin igual ao site, comportamento normal)
 ```
 
-Mesmo com o `state` certo, a transacao salva diz que era pra ser Google, nao GitHub. Entao a funcao pega essa inconsistencia e recusa.
+Confirmado: agora a rota recusa de fato uma origem diferente, sem quebrar o logout normal.
 
-## 6. Reuso da transacao (replay)
+## Caso 6 — reutilização do cookie de sessão revogado
 
-Esse aqui prova que o `code`/`state` so podem ser usados uma vez. Usei o mesmo cookie + state validos duas vezes seguidas:
+**Preparação:** copiar o valor do cookie `__Host-session` pelas DevTools (Aplicativo → Cookies) enquanto autenticado, depois clicar em "Sair".
 
-- 1a chamada: o `code` era falso (nao veio de um login real), entao a troca por token falhou la na frente — mas a transacao ja tinha sido apagada do D1 nesse momento.
-  ```
-  HTTP/2 502
-  ```
-- 2a chamada: repeti exatamente a mesma URL (mesmo cookie, mesmo state).
-  ```
-  HTTP/2 400
-  Transacao OAuth invalida ou expirada
-  ```
+**Pedido enviado:** recriar manualmente o cookie `__Host-session` com o valor copiado e chamar `GET /api/me` de novo.
 
-Isso mostra que a transacao e apagada do banco assim que o callback e recebido (antes mesmo de validar se deu certo), entao nao da pra "reaproveitar" um `code` ou `state` capturado, nem por erro nem por ataque.
+**Resultado esperado:** mesmo com o valor "certo" do cookie, como a sessão foi removida do D1 no logout, a aplicação deve recusar.
+
+**Resultado observado:** *(em andamento — aguardando confirmação)*
+
+**Como confirmar:** pelas DevTools (Aplicativo → Cookies), copiar o valor de `__Host-session` enquanto autenticado, clicar em "Sair" e depois recriar o cookie manualmente com o valor copiado antes de chamar `/api/me` de novo. Envolve manusear o cookie de sessão real, então também é um passo manual. Pelo código (`functions/oauth/logout.js`), o logout apaga a linha da sessão no D1 (`DELETE FROM sessions WHERE id_hash = ?`) antes de expirar o cookie — como `/api/me` busca a sessão por esse hash e trata "não encontrada" como não autenticado, reapresentar o cookie antigo não deve restaurar nada.
+
+Revisando o código nessa etapa encontrei um problema à parte: o `access_token` do GitHub estava sendo salvo na sessão (coluna `github_access_token`) e só era revogado no logout — isso não batia com o critério de aceitação de que o token só pode ser usado para consultar `/user` e precisa ser revogado antes da sessão ser criada. Corrigi em `functions/oauth/callback/[provider].js`: agora o token é revogado logo depois de consultar `/user`, antes do `INSERT` na tabela `sessions`, e nunca chega a ser gravado no banco. O `logout.js` ficou mais simples, só apagando a sessão e expirando o cookie.
 
 ---
 
-Resumo rapido de todos os testes:
+Resumo:
 
-| # | Cenario | Resultado esperado | Confirmado |
+| # | Cenário | Resultado esperado | Confirmado |
 |---|---------|---------------------|------------|
-| 1 | Provedor invalido no login | 400 | Sim |
-| 2 | `/api/me` sem sessao | 401 | Sim |
-| 3 | Callback sem cookie de transacao | 400 | Sim |
-| 4 | Callback com `state` errado | 400 | Sim |
-| 5 | Provedor da URL diferente da transacao | 400 | Sim |
-| 6 | Reuso de transacao ja consumida | 400 (na 2a tentativa) | Sim |
+| 1 | Retorno sem cookie temporário | 400 | Sim |
+| 2 | State alterado | 400 | Sim |
+| 3 | Reutilização da transação | 400 na 2ª tentativa | Sim |
+| 4 | Sessão expirada | Sessão tratada como inválida | Pendente — passo manual no console D1 (ver acima) |
+| 5 | Origem inválida no logout | Logout cross-site sem efeito, servidor recusa Origin diferente | Sim (implementei a checagem de Origin que faltava) |
+| 6 | Reuso de cookie revogado | Acesso negado mesmo com cookie válido | Pendente — passo manual nas DevTools (ver acima) |
+
+Os casos 4 e 6 exigem manusear diretamente a sessão real (banco de produção e cookie de sessão), então deixei o passo a passo documentado acima para rodar manualmente e colar o resultado aqui antes da entrega final.

@@ -64,7 +64,6 @@ export async function onRequestGet(context) {
   let subject;
   let email = null;
   let displayName = null;
-  let githubAccessToken = null;
 
   if (providerName === 'google') {
     const tokenResponse = await fetch(provider.tokenEndpoint, {
@@ -123,7 +122,7 @@ export async function onRequestGet(context) {
     if (!tokenData.access_token) {
       return new Response('Resposta do GitHub sem access_token', { status: 502 });
     }
-    githubAccessToken = tokenData.access_token;
+    const githubAccessToken = tokenData.access_token;
 
     const userResponse = await fetch(provider.userEndpoint, {
       headers: {
@@ -132,6 +131,26 @@ export async function onRequestGet(context) {
         Accept: 'application/vnd.github+json',
       },
     });
+
+    // O access_token do GitHub so serve pra essa unica consulta ao /user.
+    // Revogamos a autorizacao aqui, antes de criar a sessao, pra nao guardar
+    // (nem precisar guardar) um token de longa duracao no banco.
+    const credentials = btoa(`${provider.clientId}:${provider.clientSecret}`);
+    try {
+      await fetch(provider.revokeEndpoint(provider.clientId), {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Basic ${credentials}`,
+          'Content-Type': 'application/json',
+          'User-Agent': 'Projeto01-OAuth-Lab',
+          Accept: 'application/vnd.github+json',
+        },
+        body: JSON.stringify({ access_token: githubAccessToken }),
+      });
+    } catch (error) {
+      // Nao bloqueia o login caso a revogacao falhe; o token de qualquer
+      // forma nunca chega a ser persistido.
+    }
 
     if (!userResponse.ok) {
       return new Response('Falha ao buscar dados do usuario (GitHub)', { status: 502 });
@@ -151,9 +170,9 @@ export async function onRequestGet(context) {
   const expiresAt = now + SESSION_TTL_SECONDS;
 
   await env.DB.prepare(
-    `INSERT INTO sessions (id_hash, issuer, subject, email, display_name, expires_at, created_at, github_access_token)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-  ).bind(sessionIdHash, issuer, subject, email, displayName, expiresAt, now, githubAccessToken).run();
+    `INSERT INTO sessions (id_hash, issuer, subject, email, display_name, expires_at, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  ).bind(sessionIdHash, issuer, subject, email, displayName, expiresAt, now).run();
 
   const headers = new Headers();
   headers.set('Location', '/');
