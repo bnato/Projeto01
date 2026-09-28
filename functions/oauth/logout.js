@@ -8,6 +8,11 @@ import { parseCookies, buildExpiredCookie, COOKIE_NAMES } from '../_shared/cooki
 
 export async function onRequestPost(context) {
   const { request, env } = context;
+  
+  const origin = request.headers.get('Origin');
+  if (origin && origin !== new URL(request.url).origin) {
+    return new Response('Origem invalida', { status: 403 });
+  }
 
   const cookies = parseCookies(request);
   const sessionId = cookies[COOKIE_NAMES.SESSION];
