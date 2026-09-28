@@ -14,7 +14,7 @@
 - [x] o D1 guarda o resumo do cookie, não seu valor bruto;
 - [x] /api/me devolve somente o perfil necessário;
 - [x] o logout confere `Origin`, remove a sessão e expira o cookie;
-- [ ] um cookie revogado não restaura a sessão;
+- [x] um cookie revogado não restaura a sessão;
 - [ ] tokens e segredos não aparecem no HTML, nas URLs salvas, no armazenamento Web ou nos registros;
 - [ ] a dupla consegue explicar por que os arquivos estáticos permanecem públicos;
 - [ ] as sessões administrativas foram encerradas no computador compartilhado.
