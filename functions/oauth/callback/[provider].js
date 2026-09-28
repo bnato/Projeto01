@@ -64,6 +64,7 @@ export async function onRequestGet(context) {
   let subject;
   let email = null;
   let displayName = null;
+  let githubAccessToken = null;
 
   if (providerName === 'google') {
     const tokenResponse = await fetch(provider.tokenEndpoint, {
@@ -122,10 +123,11 @@ export async function onRequestGet(context) {
     if (!tokenData.access_token) {
       return new Response('Resposta do GitHub sem access_token', { status: 502 });
     }
+    githubAccessToken = tokenData.access_token;
 
     const userResponse = await fetch(provider.userEndpoint, {
       headers: {
-        Authorization: `Bearer ${tokenData.access_token}`,
+        Authorization: `Bearer ${githubAccessToken}`,
         'User-Agent': 'Projeto01-OAuth-Lab',
         Accept: 'application/vnd.github+json',
       },
@@ -149,9 +151,9 @@ export async function onRequestGet(context) {
   const expiresAt = now + SESSION_TTL_SECONDS;
 
   await env.DB.prepare(
-    `INSERT INTO sessions (id_hash, issuer, subject, email, display_name, expires_at, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(sessionIdHash, issuer, subject, email, displayName, expiresAt, now).run();
+    `INSERT INTO sessions (id_hash, issuer, subject, email, display_name, expires_at, created_at, github_access_token)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(sessionIdHash, issuer, subject, email, displayName, expiresAt, now, githubAccessToken).run();
 
   const headers = new Headers();
   headers.set('Location', '/');
