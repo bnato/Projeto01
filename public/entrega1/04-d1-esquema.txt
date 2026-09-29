@@ -1,0 +1,13 @@
+Consulta executada no console do banco D1 (equipegabrielesophia):
+
+SELECT name, type FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name;
+
+Resultado:
+
+name                        | type
+-----------------------------|-------
+oauth_transactions_expiry   | index
+sessions_expiry             | index
+_cf_KV                      | table
+oauth_transactions          | table
+sessions                    | table

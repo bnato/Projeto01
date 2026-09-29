@@ -1,0 +1,3 @@
+URL de retorno cadastrada no cliente OAuth 2.0 do Google (Aplicativo da Web "oauth-lab-web"):
+
+https://projeto01-j0i.pages.dev/oauth/callback/google

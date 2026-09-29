@@ -1,0 +1,4 @@
+Página inicial e URL de retorno cadastradas na OAuth App "oauth-lab-web" (GitHub):
+
+Homepage URL: https://projeto01-j0i.pages.dev
+Authorization callback URL: https://projeto01-j0i.pages.dev/oauth/callback/github
