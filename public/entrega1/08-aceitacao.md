@@ -3,7 +3,7 @@
 - [x] o site é servido pelo endereço `pages.dev` atribuído à equipe;
 - [x] os arquivos estáticos e as Functions compartilham a mesma origem;
 - [x] o projeto foi publicado por integração com GitHub;
-- [ ] a equipe não instalou nem executou Node.js, `npm`, `npx` ou Wrangler;
+- [x] a equipe não instalou nem executou Node.js, `npm`, `npx` ou Wrangler;
 - [x] cada provedor usa uma URL de retorno própria e exata;
 - [x] os pedidos de autorização usam código e PKCE `S256`;
 - [x] a Function apresenta o Client Secret correto somente na troca de tokens;
@@ -17,4 +17,4 @@
 - [x] um cookie revogado não restaura a sessão;
 - [ ] tokens e segredos não aparecem no HTML, nas URLs salvas, no armazenamento Web ou nos registros;
 - [ ] a dupla consegue explicar por que os arquivos estáticos permanecem públicos;
-- [ ] as sessões administrativas foram encerradas no computador compartilhado.
+- [x] as sessões administrativas foram encerradas no computador compartilhado.
