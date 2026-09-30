@@ -109,25 +109,27 @@ Confirmado: a rota recusa uma origem diferente e também a ausência de `Origin`
 
 ## Caso 6 — reutilização do cookie de sessão revogado
 
-**Preparação:** copiar o valor do cookie `__Host-session` pelas DevTools (Aplicativo → Cookies) enquanto autenticado, depois clicar em "Sair".
+**Preparação:** em uma janela anônima, fiz login no site e copiei temporariamente o valor do cookie `__Host-session` pelas DevTools (Application → Cookies). No terminal, guardei o valor numa variável com `Read-Host`, para ele não ficar no histórico do PowerShell nem nesta evidência.
 
-**Pedido enviado:** recriar manualmente o cookie `__Host-session` com o valor copiado e chamar `GET /api/me` de novo.
+**Pedido enviado:** `GET /api/me` com esse mesmo cookie, antes e depois de clicar em "Sair" no navegador:
 
-**Resultado esperado:** mesmo com o valor "certo" do cookie, como a sessão foi removida do D1 no logout, a aplicação deve recusar.
-
-**Resultado observado:** confirmado por análise de código, apoiada no teste real do Caso 4 acima, em vez de copiar/recriar manualmente o cookie de sessão real pelas DevTools (evitei manusear esse valor sensível fora do fluxo normal do navegador).
-
-`functions/oauth/logout.js` apaga a linha da sessão no D1 assim que o logout roda:
-```js
-await env.DB.prepare(`DELETE FROM sessions WHERE id_hash = ?`).bind(sessionIdHash).run();
+```powershell
+$c = Read-Host "cookie"   # valor colado manualmente, não registrado
+"Antes do logout: " + (curl.exe -s -o NUL -w "%{http_code}" -H "Cookie: __Host-session=$c" https://projeto01-j0i.pages.dev/api/me)
+# clique em "Sair" no navegador
+"Depois do logout: " + (curl.exe -s -o NUL -w "%{http_code}" -H "Cookie: __Host-session=$c" https://projeto01-j0i.pages.dev/api/me)
+Remove-Variable c
 ```
-E `functions/api/me.js` trata "sessão não encontrada" exatamente da mesma forma que trata "sessão expirada":
-```js
-if (!session || session.expires_at < now) {
-  return new Response(JSON.stringify({ authenticated: false }), { status: 401, ... });
-}
+
+**Resultado esperado:** mesmo com o valor "certo" do cookie, como a sessão foi removida do D1 no logout, a aplicação deve recusar com 401.
+
+**Resultado observado (30/09/2026):**
 ```
-O Caso 4 já provou, na prática, que esse `if` corta o acesso quando a linha correspondente ao cookie deixa de valer (lá foi por `expires_at` vencido; aqui é pela linha inteira sumir do banco — o mesmo `!session` do teste real). Como o cookie em si não muda no logout (só é marcado como expirado no navegador, sem invalidar o valor que ele carrega), a única coisa que impede o reuso é a sessão ter sido apagada do D1 — e isso está confirmado.
+Antes do logout: 200
+Depois do logout: 401
+```
+
+O mesmo valor de cookie que abria a sessão passou a ser recusado depois do logout. Isso acontece porque `functions/oauth/logout.js` apaga a linha da sessão no D1 (`DELETE FROM sessions WHERE id_hash = ?`) e `functions/api/me.js` responde 401 quando não encontra uma sessão válida para o resumo do cookie. A cópia do valor foi apagada logo após o teste.
 
 Revisando o código nessa etapa encontrei um problema à parte: o `access_token` do GitHub estava sendo salvo na sessão (coluna `github_access_token`) e só era revogado no logout — isso não batia com o critério de aceitação de que o token só pode ser usado para consultar `/user` e precisa ser revogado antes da sessão ser criada. Corrigi em `functions/oauth/callback/[provider].js`: agora o token é revogado logo depois de consultar `/user`, antes do `INSERT` na tabela `sessions`, e nunca chega a ser gravado no banco. O `logout.js` ficou mais simples, só apagando a sessão e expirando o cookie.
 
@@ -142,4 +144,4 @@ Resumo:
 | 3 | Reutilização da transação | 400 na 2ª tentativa | Sim |
 | 4 | Sessão expirada | Sessão tratada como inválida | Sim |
 | 5 | Origem inválida no logout | 403 para Origin diferente ou ausente; sessão original continua válida | Sim (403 / 403 / 302 no teste após a correção) |
-| 6 | Reuso de cookie revogado | Acesso negado mesmo com cookie válido | Sim (por análise de código, apoiada no teste real do Caso 4 — ver acima) |
+| 6 | Reuso de cookie revogado | 401 com o cookie copiado antes do logout | Sim (200 antes do logout, 401 depois) |
