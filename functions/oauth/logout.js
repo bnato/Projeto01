@@ -1,18 +1,18 @@
 // functions/oauth/logout.js
-// Encerra a sessao do usuario: apaga a sessao no D1 e limpa o cookie de
-// sessao. (A revogacao do access_token do GitHub acontece antes, no
-// callback, logo apos a consulta ao /user — nenhum token fica guardado
-// no D1 para ser revogado aqui.)
+// Revoga a sessao local: exige Origin igual a PUBLIC_BASE_URL, apaga a linha
+// da sessao no D1 e expira o cookie. Nao encerra a sessao no Google/GitHub.
 
 import { sha256Hex } from '../_shared/crypto.js';
 import { parseCookies, buildExpiredCookie, COOKIE_NAMES } from '../_shared/cookies.js';
+import { textResponse, redirectResponse } from '../_shared/http.js';
 
 export async function onRequestPost(context) {
   const { request, env } = context;
 
+  // Origin e obrigatorio e precisa ser exatamente PUBLIC_BASE_URL.
   const origin = request.headers.get('Origin');
-  if (origin && origin !== new URL(request.url).origin) {
-    return new Response('Origem invalida', { status: 403 });
+  if (!origin || origin !== env.PUBLIC_BASE_URL) {
+    return textResponse('Origem invalida', 403);
   }
 
   const cookies = parseCookies(request);
@@ -23,9 +23,5 @@ export async function onRequestPost(context) {
     await env.DB.prepare(`DELETE FROM sessions WHERE id_hash = ?`).bind(sessionIdHash).run();
   }
 
-  const headers = new Headers();
-  headers.set('Location', '/');
-  headers.append('Set-Cookie', buildExpiredCookie(COOKIE_NAMES.SESSION));
-
-  return new Response(null, { status: 302, headers });
+  return redirectResponse(env.PUBLIC_BASE_URL, [buildExpiredCookie(COOKIE_NAMES.SESSION)]);
 }
