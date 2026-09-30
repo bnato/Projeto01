@@ -88,20 +88,24 @@ fetch('https://projeto01-j0i.pages.dev/oauth/logout', { method: 'POST', credenti
 
 **Resultado observado:** a chamada pelo navegador falhou (`TypeError: Failed to fetch`), efeito combinado de CORS e do `SameSite=Strict` do cookie de sessão, que o Chrome nem chega a anexar numa requisição de outra origem. Voltando na aba com a sessão real e recarregando a página, continuei autenticado normalmente — a tentativa cross-site não teve efeito nenhum na sessão.
 
-Só que, testando via `curl` com um `Origin: https://example.com` forjado direto na API (sem passar pelas regras do navegador), a rota respondia 302 normalmente — ou seja, o servidor não estava de fato checando o `Origin`, só existia a proteção do lado do navegador (`SameSite=Strict`). Reportei isso e implementei a checagem que faltava em `functions/oauth/logout.js`: agora a rota lê o header `Origin` e, se ele vier preenchido e for diferente da origem do próprio site, responde 403 antes de tocar em qualquer coisa. Depois do deploy, repeti o mesmo teste:
+Só que, na primeira versão, testando via `curl` com um `Origin: https://example.com` forjado direto na API (sem passar pelas regras do navegador), a rota respondia 302 normalmente — ou seja, o servidor não estava de fato checando o `Origin`, só existia a proteção do lado do navegador (`SameSite=Strict`). Corrigi `functions/oauth/logout.js` conforme o enunciado: agora a rota **exige** o cabeçalho `Origin` e só aceita um valor exatamente igual a `PUBLIC_BASE_URL`; sem `Origin` ou com outra origem, responde 403 antes de tocar no D1. A resposta também usa `Cache-Control: no-store`.
 
-```
-curl -X POST -H "Origin: https://example.com" https://projeto01-j0i.pages.dev/oauth/logout
-→ HTTP/2 403
+Depois do deploy, repeti o teste no terminal (PowerShell, 30/09/2026). Nenhuma das chamadas envia cookie de sessão, então nenhuma sessão real foi afetada:
 
-curl -X POST https://projeto01-j0i.pages.dev/oauth/logout
-→ HTTP/2 302 (sem Origin, comportamento normal)
-
-curl -X POST -H "Origin: https://projeto01-j0i.pages.dev" https://projeto01-j0i.pages.dev/oauth/logout
-→ HTTP/2 302 (Origin igual ao site, comportamento normal)
+```powershell
+$u="https://projeto01-j0i.pages.dev/oauth/logout"
+"Origin example.com: " + (curl.exe -s -o NUL -w "%{http_code}" -X POST -H "Origin: https://example.com" $u)
+"Sem Origin:         " + (curl.exe -s -o NUL -w "%{http_code}" -X POST $u)
+"Origin do site:     " + (curl.exe -s -o NUL -w "%{http_code}" -X POST -H "Origin: https://projeto01-j0i.pages.dev" $u)
 ```
 
-Confirmado: agora a rota recusa de fato uma origem diferente, sem quebrar o logout normal.
+```
+Origin example.com: 403
+Sem Origin:         403
+Origin do site:     302
+```
+
+Confirmado: a rota recusa uma origem diferente e também a ausência de `Origin`, e só executa o logout quando o pedido vem da própria origem do site.
 
 ## Caso 6 — reutilização do cookie de sessão revogado
 
@@ -137,5 +141,5 @@ Resumo:
 | 2 | State alterado | 400 | Sim |
 | 3 | Reutilização da transação | 400 na 2ª tentativa | Sim |
 | 4 | Sessão expirada | Sessão tratada como inválida | Sim |
-| 5 | Origem inválida no logout | Logout cross-site sem efeito, servidor recusa Origin diferente | Sim (implementei a checagem de Origin que faltava) |
+| 5 | Origem inválida no logout | 403 para Origin diferente ou ausente; sessão original continua válida | Sim (403 / 403 / 302 no teste após a correção) |
 | 6 | Reuso de cookie revogado | Acesso negado mesmo com cookie válido | Sim (por análise de código, apoiada no teste real do Caso 4 — ver acima) |
