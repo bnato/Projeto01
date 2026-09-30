@@ -68,7 +68,7 @@ A transação é apagada do banco assim que o callback é recebido, então não 
 **Resultado observado:**
 ```sql
 SELECT id_hash, issuer, expires_at FROM sessions ORDER BY created_at DESC LIMIT 1;
-→ c0787fd56bf549279921496c4f88bb27f323566118aeb6c45b42baafaf6bb36e | https://github.com | 1790665872
+→ [REMOVIDO] | https://github.com | [REMOVIDO]
 
 UPDATE sessions SET expires_at = 0 WHERE id_hash = (SELECT id_hash FROM sessions ORDER BY created_at DESC LIMIT 1);
 → query executada com sucesso
