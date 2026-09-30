@@ -1,16 +1,16 @@
-# Projeto01
+# Projeto01 — Login OAuth em site estático no Cloudflare Pages
 
-Este é o repositório do Projeto01, utilizando o template [Light Bootstrap Dashboard](https://github.com/creativetimofficial/light-bootstrap-dashboard) de autoria da Creative Tim.
+Laboratório de autenticação com Google (OIDC) e GitHub (OAuth App) em um único projeto do Cloudflare Pages, publicado em https://projeto01-j0i.pages.dev.
 
-O painel é responsivo e construído com Bootstrap 4, contendo diversos componentes pré-desenvolvidos (gráficos, tabelas, mapas, perfis de usuário, etc.) úteis para painéis administrativos e dashboards.
+## Estrutura
 
-## Estrutura do Projeto
+- `public/` — arquivos estáticos (página de login `index.html`, `app.js`, dashboard de modelo e a pasta `entrega1` com as evidências). Tudo aqui é público.
+- `functions/` — Pages Functions executadas na Cloudflare:
+  - `oauth/login/[provider].js` — cria a transação (state, PKCE S256 e, no Google, nonce) e redireciona ao provedor;
+  - `oauth/callback/[provider].js` — valida a transação, troca o código, confirma a identidade e cria a sessão opaca;
+  - `oauth/logout.js` — revoga a sessão local (somente POST com `Origin` igual a `PUBLIC_BASE_URL`);
+  - `api/me.js` — devolve o perfil mínimo da sessão;
+  - `api/health.js` — verificação da implantação;
+  - `_shared/` — funções auxiliares (Web Crypto, cookies, provedores, validação OIDC, respostas HTTP).
 
-*   `/assets/` - Estilos (CSS, Sass), fontes, imagens e scripts (JS/Plugins) do dashboard.
-*   `/examples/` - Páginas de exemplo do dashboard (como `dashboard.html`, `user.html`, `table.html`, etc.).
-*   `/documentation/` - Documentação oficial do template.
-*   `index.html` - Página inicial que redireciona automaticamente para o dashboard principal em `/examples/dashboard.html`.
-
-## Como Executar
-
-Basta abrir o arquivo `index.html` ou qualquer arquivo HTML dentro da pasta `/examples/` em um navegador web de sua escolha, ou servir o repositório usando um servidor local de arquivos estáticos.
+Os Client IDs ficam como variáveis e os Client Secrets como segredos criptografados no painel do Pages. Nenhum segredo é versionado. O banco D1 é ligado ao projeto como `DB`.
