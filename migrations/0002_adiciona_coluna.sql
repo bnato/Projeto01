@@ -1,1 +1,1 @@
-ALTER TABL notas ADD COLUMN observacao TEXT;
+ALTER TABLE notas ADD COLUMN observacao TEXT;
