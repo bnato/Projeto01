@@ -1,0 +1,8 @@
+name = "projeto01"
+compatibility_date = "2026-10-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "equipegabrielesophia"
+database_id = "2ecdf377-1207-4d02-9178-15379ce4231b"
+migrations_dir = "migrations"
