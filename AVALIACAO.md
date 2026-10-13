@@ -25,8 +25,8 @@ Crítica: sem comentários gerados não há afirmação da IA para criticar; est
 
 - Merge do PR #2 disparou o workflow: https://github.com/bnato/Projeto01/actions/runs/38477604472
 - Log: 0001_cria_notas.sql e 0002_adiciona_coluna.sql aplicadas no D1 remoto (ambas com sucesso).
-- Saída do PRAGMA table_info(notas): pendente, a ser colada pelo aluno.
-- Merge sem alterar migrations/: o merge deste PR (só AVALIACAO.md) não deve disparar o migrar, por causa do filtro paths.
+- Saída do PRAGMA table_info(notas), rodada no console do D1 (Cloudflare, banco equipegabrielesophia): colunas id, aluno, disciplina, nota, criado_em e observacao (cid 5, TEXT, aceita nulo). Isso prova que a migração 0002 foi aplicada no banco remoto.
+- Merge sem alterar migrations/: os merges dos PRs #3 (c8152ab) e #5 (0dd2362) só mexeram em AVALIACAO.md e rodaram apenas ci e deploy do Pages; a lista de execuções do migrar continua com só 2 (#1 falhou sem segredos, #2 do merge do PR #2): https://github.com/bnato/Projeto01/actions/workflows/migrar.yml
 
 ## Perguntas
 
