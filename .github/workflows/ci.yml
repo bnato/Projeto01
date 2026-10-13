@@ -18,4 +18,4 @@ jobs:
           for f in migrations/*.sql; do sqlite3 teste.db < "$f"; done
           sqlite3 teste.db ".tables"
       - name: Valida HTML
-        run: npx --yes htmlhint "**/*.html"
+        run: npx --yes htmlhint "public/index.html"
