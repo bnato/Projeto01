@@ -17,7 +17,7 @@ Aluno: Gabriel Benato Batistel Correa — Repositório: bnato/Projeto01
 
 ## Tarefa 3 — revisao-ia.yml
 
-O workflow foi criado conforme o enunciado, mas o passo actions/ai-inference falhou nas 3 tentativas com o erro "Cannot use 'in' operator to search for 'choices' in OK". Token com permissão Copilot Requests e plano Copilot ativos, YAML igual ao README da action; a causa não foi identificada. Por isso não há comentários da IA nem o teste de remoção de pull-requests: write. O último passo (gh pr comment) nunca chega a rodar.
+O workflow foi criado conforme o enunciado, mas a revisão por IA não funcionou. Com actions/ai-inference@v1 o passo falhou nas 3 tentativas com "Cannot use 'in' operator to search for 'choices' in OK". Ao testar a branch bnato-patch-2 (PR #4) com actions/ai-inference@main, o erro mudou para "Copilot CLI exited with code 1", ou seja, a action passa a chamar o Copilot CLI e ele falha, provavelmente por autenticação ou permissão do COPILOT_PAT (token com Copilot Requests, plano Copilot Student ativo). A causa exata não foi confirmada: o stderr do CLI só aparece com ACTIONS_STEP_DEBUG=true. Por isso não há comentários da IA nem o teste de remoção de pull-requests: write. O último passo (gh pr comment) nunca chega a rodar.
 
 Crítica: sem comentários gerados não há afirmação da IA para criticar; este ponto fica em aberto.
 
