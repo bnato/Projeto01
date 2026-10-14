@@ -5,7 +5,7 @@ on:
 permissions:
   contents: read
   pull-requests: write
-  models: read
+
 jobs:
   revisar:
     runs-on: ubuntu-latest
