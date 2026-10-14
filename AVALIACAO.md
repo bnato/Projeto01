@@ -13,7 +13,11 @@ Aluno: Gabriel Benato Batistel Correa — Repositório: bnato/Projeto01
 
 - Ruleset exige PR e o status check "verificar"; a API confirma em https://api.github.com/repos/bnato/Projeto01/rules/branches/main
 - PR bloqueado (check vermelho) e depois liberado após corrigir o SQL: https://github.com/bnato/Projeto01/pull/2
-- Push direto recusado: ver saída do terminal anexada pelo aluno (pendente).
+- Push direto recusado (git push origin main, a partir de um clone local): 
+  remote: error: GH013: Repository rule violations found for refs/heads/main.
+  remote: - Changes must be made through a pull request.
+  remote: - Required status check "verificar" is expected.
+  ! [remote rejected] main -> main (push declined due to repository rule violations)
 
 ## Tarefa 3 — revisao-ia.yml
 
