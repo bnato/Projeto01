@@ -5,7 +5,7 @@ Aluno: Gabriel Benato Batistel Correa — Repositório: bnato/Projeto01
 ## Tarefa 1 — ci.yml
 
 - Execução vermelha (htmlhint reprovou o template HTML): https://github.com/bnato/Projeto01/actions/runs/38470699553
-- Execução vermelha (migração com SQL errado, PR #2): https://github.com/bnato/Projeto01/pull/2 (ci / verificar falhou no passo de migrações)
+- Execução vermelha (migração com SQL errado, PR #2): https://github.com/bnato/Projeto01/actions/runs/38476852906 — linha do erro no passo "Aplica as migrações D1 em um SQLite local": Parse error near line 1: near "TABL": syntax error
 - Execução verde (PR #1, após o conserto): https://github.com/bnato/Projeto01/pull/1
 - Por que testar as migrações em SQLite antes do D1: o D1 é SQLite, então um SQL inválido falha em segundos e de graça no CI, em vez de quebrar o banco remoto durante o deploy.
 
