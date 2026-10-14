@@ -33,6 +33,7 @@ jobs:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
         with:
           prompt-file: prompt.txt
+          model: ''
           system-prompt: Você é um revisor de código objetivo.
       - name: Comenta no PR
         env:
